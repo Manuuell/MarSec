@@ -10,7 +10,6 @@ void main() async {
 }
 
 
-
 class CiberShieldApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -42,12 +41,19 @@ class CiberShieldApp extends StatelessWidget {
         '/': (context) => OnboardingScreen(),
         '/login': (context) => LoginScreen(),
         '/home': (context) => MainMenuScreen(),
-          '/quiz': (context) =>QuizScreen(questions: []),
+        '/quiz': (context) {
+          final questions = ModalRoute.of(context)!.settings.arguments as List<Map<String, dynamic>>;
+          return QuizScreen(questions: questions);
+        },
         '/tips': (context) => TipsScreen(),
+        '/profile': (context) => ProfilePage(),
+        '/lessons': (context) => LessonsPage(),  // Aquí agregamos la ruta para Lecciones
+        '/chatbot': (context) => ChatbotScreen(),  // Aquí agregamos la ruta para Capitán Ciber
       },
     );
   }
 }
+
 
 class OnboardingScreen extends StatelessWidget {
   @override
@@ -229,6 +235,7 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen> {
   List<Map<String, dynamic>> _questions = [];
+  bool isLoading = true;  // Esta variable controla el indicador de carga
 
   @override
   void initState() {
@@ -238,12 +245,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   Future<void> loadQuestions() async {
     try {
-      final questions = await generateQuizQuestions(); // Asume que esta función es asíncrona
+      // Simulamos la carga de preguntas
+      final questions = await generateQuizQuestions();
       setState(() {
         _questions = questions;
+        isLoading = false; // Cambiar el estado de carga cuando termine
       });
     } catch (e) {
       print('Error cargando las preguntas: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -273,57 +285,61 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   ),
                 ),
                 SizedBox(height: 40),
+                // Aquí mostramos un indicador de carga solo cuando estamos cargando las preguntas
+                if (isLoading)
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF36C9C9)),
+                  ),
+                SizedBox(height: 20),
                 _MenuButton(
                   icon: Icons.book,
                   label: 'Lecciones',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => LessonsPage()),
-                    );
+                    // Navegar a la página de Lecciones
+                    Navigator.pushNamed(context, '/lessons');
                   },
                 ),
                 _MenuButton(
                   icon: Icons.chat,
                   label: 'Capitán Ciber',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ChatbotScreen()),
-                    );
+                    // Navegar al chatbot
+                    Navigator.pushNamed(context, '/chatbot');
                   },
                 ),
-                _MenuButton(
-                  icon: Icons.quiz,
-                  label: 'Quiz',
-                  onPressed: () {
-                    if (_questions.isEmpty) {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text("Error"),
-                          content: Text("No se cargaron preguntas. Intenta nuevamente."),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: Text("OK"),
-                            ),
-                          ],
-                        ),
-                      );
-                    } else {
-                      Navigator.pushNamed(
-                        context,
-                        '/quiz',
-                        arguments: _questions,  // Pasa las preguntas cargadas
-                      );
-                    }
-                  },
-                ),
+                if (!isLoading)
+                  _MenuButton(
+                    icon: Icons.quiz,
+                    label: 'Quiz',
+                    onPressed: () {
+                      if (_questions.isEmpty) {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text("Error"),
+                            content: Text("No se cargaron preguntas. Intenta nuevamente."),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text("OK"),
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        Navigator.pushNamed(
+                          context,
+                          '/quiz',
+                          arguments: _questions,
+                        );
+                      }
+                    },
+                  ),
                 _MenuButton(
                   icon: Icons.lightbulb,
                   label: 'Consejos',
                   onPressed: () {
+                    // Navegar a la página de Consejos
                     Navigator.pushNamed(context, '/tips');
                   },
                 ),
@@ -331,10 +347,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   icon: Icons.person,
                   label: 'Perfil',
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ProfilePage()),
-                    );
+                    // Navegar a la página de Perfil
+                    Navigator.pushNamed(context, '/profile');
                   },
                 ),
               ],
@@ -345,10 +359,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 }
-
-
-
-
 
 class ChatbotScreen extends StatefulWidget {
   @override
@@ -1672,9 +1682,6 @@ class _MalwareQuizState extends State<MalwareQuiz> {
 
 Future<List<Map<String, dynamic>>> generateQuizQuestions() async {
   try {
-    print('Generando preguntas de ciberseguridad...');
-
-    // Realiza la solicitud a la API de OpenAI para obtener las preguntas
     final response = await http.post(
       Uri.parse('https://api.openai.com/v1/chat/completions'),
       headers: {
@@ -1686,76 +1693,63 @@ Future<List<Map<String, dynamic>>> generateQuizQuestions() async {
         'messages': [
           {
             'role': 'system',
-            'content': 'Eres un asistente que genera preguntas de opción múltiple sobre ciberseguridad.'
+            'content': 'Eres un asistente que genera preguntas de opción múltiple sobre ciberseguridad. ¡Devuélvelas únicamente como un array JSON, sin texto adicional!'
           },
           {
             'role': 'user',
-            'content': 'Genera 5 preguntas de opción múltiple sobre seguridad informática para un quiz.'
+            'content': '''Genera 5 preguntas de opción múltiple sobre seguridad informática para un quiz.
+Devuélvelas **solo** en este formato JSON:
+[
+  {
+    "question": "¿…?",
+    "options": ["A", "B", "C", "D"],
+    "correctAnswer": 0
+  },
+  … (5 objetos)
+]'''
           }
         ],
-        'max_tokens': 300,
-        'temperature': 0.5,
+        'max_tokens': 500,
+        'temperature': 0.7,
       }),
     );
 
-    print('Respuesta recibida: ${response.statusCode}');
-    if (response.statusCode == 200) {
-      var responseData = json.decode(response.body);
-
-      // Depuración: Imprimir toda la respuesta para ver qué devuelve la API
-      print('Respuesta de la API: $responseData');
-
-      String generatedContent = responseData['choices'][0]['message']['content'];
-
-      // Depuración: Verifica que el contenido está llegando correctamente
-      print('Contenido generado por ChatGPT: $generatedContent');
-
-      List<Map<String, dynamic>> questions = parseQuestions(generatedContent);
-      return questions;
-    } else {
-      print('Error en la solicitud: ${response.statusCode}');
+    if (response.statusCode != 200) {
+      print('Error API: ${response.statusCode}');
       return [];
     }
+
+    // Aquí viene el cambio clave: leemos los bytes crudos y los decodificamos como UTF-8
+    final raw = utf8.decode(response.bodyBytes);
+
+    // Parseamos el JSON completo
+    final data = json.decode(raw);
+    final content = data['choices'][0]['message']['content'] as String;
+
+    // Extraemos solo el array JSON
+    final start = content.indexOf('[');
+    final end = content.lastIndexOf(']');
+    if (start < 0 || end <= start) {
+      print('JSON no encontrado en la respuesta: $content');
+      return [];
+    }
+    final jsonString = content.substring(start, end + 1);
+
+    // Parseamos el array de preguntas
+    final List<dynamic> parsed = json.decode(jsonString);
+    return parsed.map((e) => {
+      'question': e['question'] as String,
+      'options': List<String>.from(e['options'] as List),
+      'correctAnswer': e['correctAnswer'] as int,
+    }).toList();
   } catch (e) {
-    print('Error en la conexión: $e');
+    print('Error generando preguntas: $e');
     return [];
   }
 }
 
-List<Map<String, dynamic>> parseQuestions(String content) {
-  List<Map<String, dynamic>> questions = [];
-  try {
-    var questionBlocks = content.split('\n\n'); // Suponiendo que cada pregunta está separada por un doble salto de línea
-    for (var block in questionBlocks) {
-      var lines = block.split('\n');
-      if (lines.length < 4) continue; // Ignorar bloques con menos de 4 líneas
-
-      String question = lines[0].substring(3); // Obtener la pregunta (removemos el "Pregunta X: ")
-      List<String> options = [];
-      for (int i = 1; i < lines.length - 1; i++) {
-        options.add(lines[i].substring(3)); // Removemos los prefijos "a)", "b)", etc.
-      }
-
-      String correctAnswerLetter = lines.last.split(':')[1].trim(); // Extraemos la letra de la respuesta correcta
-
-      int correctAnswerIndex = options.indexOf(correctAnswerLetter);
-
-      questions.add({
-        'question': question,
-        'options': options,
-        'correctAnswer': correctAnswerIndex,
-      });
-    }
-  } catch (e) {
-    print("Error al parsear las preguntas: $e");
-  }
-  return questions;
-}
-
 class QuizScreen extends StatefulWidget {
   final List<Map<String, dynamic>> questions;
-
-  // Recibimos las preguntas al crear el widget
   QuizScreen({Key? key, required this.questions}) : super(key: key);
 
   @override
@@ -1767,10 +1761,40 @@ class _QuizScreenState extends State<QuizScreen> {
   int _score = 0;
   int? _selectedAnswer;
   bool _answered = false;
+  bool _showResult = false;
+
+  void _selectAnswer(int index) {
+    if (_answered) return;
+    setState(() {
+      _selectedAnswer = index;
+      _answered = true;
+      if (index == widget.questions[_currentQuestionIndex]['correctAnswer']) {
+        _score++;
+      }
+    });
+  }
+
+  void _nextQuestion() {
+    setState(() {
+      if (_currentQuestionIndex + 1 < widget.questions.length) {
+        _currentQuestionIndex++;
+        _selectedAnswer = null;
+        _answered = false;
+      } else {
+        _finishQuiz();
+      }
+    });
+  }
+
+  void _finishQuiz() {
+    setState(() {
+      _showResult = true; // Mostramos el resultado final
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.questions.isEmpty) {
+    if (_showResult) {
       return Scaffold(
         backgroundColor: const Color(0xFF0C1A3C),
         body: Center(
@@ -1780,30 +1804,64 @@ class _QuizScreenState extends State<QuizScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.error,
-                  color: Colors.redAccent,
+                  _score >= 3 ? Icons.emoji_events : Icons.error,
+                  color: _score >= 3 ? Colors.greenAccent : Colors.redAccent,
                   size: 80,
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'No se cargaron preguntas. Intenta nuevamente.',
+                  _score >= 3
+                      ? '¡Bien hecho, has aprobado!'
+                      : 'No alcanzaste el mínimo. Intenta nuevamente.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context); // Volver a la pantalla anterior
+                    if (_score >= 3) {
+                      Navigator.pop(context); // Cerrar quiz
+                    } else {
+                      setState(() {
+                        _currentQuestionIndex = 0;
+                        _score = 0;
+                        _selectedAnswer = null;
+                        _answered = false;
+                        _showResult = false; // Reintentar quiz
+                      });
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF36C9C9),
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
-                  child: const Text('Finalizar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    _score >= 3 ? 'Finalizar' : 'Reintentar',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
+          ),
+        ),
+      );
+    }
+
+    // Validar si hay preguntas
+    if (widget.questions.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0C1A3C),
+        body: Center(
+          child: Text(
+            "No hay preguntas disponibles.",
+            style: TextStyle(color: Colors.white, fontSize: 22),
           ),
         ),
       );
@@ -1851,7 +1909,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 onTap: () => _selectAnswer(index),
                 child: Container(
                   margin: const EdgeInsets.symmetric(vertical: 8),
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: BorderRadius.circular(12),
@@ -1870,38 +1928,19 @@ class _QuizScreenState extends State<QuizScreen> {
                 onPressed: _answered ? _nextQuestion : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF36C9C9),
-                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 ),
                 child: const Text('Siguiente', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ),
-            ),
+            )
           ],
         ),
       ),
     );
   }
-
-  void _selectAnswer(int index) {
-    if (_answered) return;
-    setState(() {
-      _selectedAnswer = index;
-      _answered = true;
-      if (index == widget.questions[_currentQuestionIndex]['correctAnswer']) {
-        _score++;
-      }
-    });
-  }
-
-  void _nextQuestion() {
-    setState(() {
-      _currentQuestionIndex++;
-      _selectedAnswer = null;
-      _answered = false;
-    });
-  }
 }
+
 
 
 
