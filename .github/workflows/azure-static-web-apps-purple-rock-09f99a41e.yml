@@ -22,20 +22,19 @@ jobs:
       contents: read
 
     steps:
-      # 1. Checkout the repository
+      # 1. Checkout the repo
       - uses: actions/checkout@v3
         with:
           submodules: true
           lfs: false
 
-      # 2. Install Flutter SDK from the stable channel
+      # 2. Instala Flutter (canal stable)
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          # flutter-version: 3.10.5  # opcional: fija una versión concreta
 
-      # 3. Cache Pub packages between runs
+      # 3. Cache de paquetes pub
       - name: Cache Pub Packages
         uses: actions/cache@v3
         with:
@@ -44,19 +43,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      # 4. Get Flutter dependencies
+      # 4. Obtener dependencias (en el sub‑directorio de tu app)
       - name: Install dependencies
+        working-directory: untitled1
         run: flutter pub get
 
-      # 5. Build Flutter Web in release mode
+      # 5. Generar la web
       - name: Build Flutter Web
+        working-directory: untitled1
         run: flutter build web --release
 
-      # 6. Install OIDC client package for Azure Static Web Apps auth
-      - name: Install OIDC Client from Core Package
+      # 6. Instala el client OIDC para Azure SWA
+      - name: Install OIDC Client
         run: npm install @actions/core@1.6.0 @actions/http-client
 
-      # 7. Acquire GitHub OIDC ID token
+      # 7. Consigue el ID token de GitHub
       - name: Get Id Token
         uses: actions/github-script@v6
         id: idtoken
@@ -66,16 +67,16 @@ jobs:
             return await core.getIDToken();
           result-encoding: string
 
-      # 8. Deploy to Azure Static Web Apps
+      # 8. Despliega todo a Azure Static Web Apps
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PURPLE_ROCK_09F99A41E }}
           action: upload
-          app_location: "/"                   # Ruta a tu proyecto Flutter
-          api_location: ""                    # Vacío si no utilizas Azure Functions
-          output_location: "build/web"        # Carpeta generada por `flutter build web`
+          app_location: "untitled1"           # Carpeta raíz de tu Flutter Web
+          api_location: ""                     # vacío si no tienes Azure Functions
+          output_location: "untitled1/build/web"  # Carpeta generada por flutter build web
           github_id_token: ${{ steps.idtoken.outputs.result }}
 
   close_pull_request_job:
@@ -83,7 +84,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Close Pull Request Job
     steps:
-      - name: Close Pull Request
-        uses: Azure/static-web-apps-deploy@v1
+      - uses: Azure/static-web-apps-deploy@v1
         with:
           action: close
