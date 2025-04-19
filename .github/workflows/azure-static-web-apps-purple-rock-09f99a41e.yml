@@ -1,3 +1,4 @@
+# .github/workflows/azure-static-web-apps.yml
 name: Azure Static Web Apps CI/CD
 
 on:
@@ -11,26 +12,30 @@ on:
 
 jobs:
   build_and_deploy_job:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     permissions:
-       id-token: write
-       contents: read
+      id-token: write
+      contents: read
 
     steps:
+      # 1. Checkout the repository
       - uses: actions/checkout@v3
         with:
           submodules: true
           lfs: false
 
-      # 1) Instala Flutter
+      # 2. Install Flutter SDK from the stable channel
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          channel: stable
+          # flutter-version: 3.10.5  # opcional: fija una versión concreta
 
-      # 2) Trae las dependencias de pub y cachea para acelerar builds
+      # 3. Cache Pub packages between runs
       - name: Cache Pub Packages
         uses: actions/cache@v3
         with:
@@ -39,35 +44,38 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
+      # 4. Get Flutter dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 3) Compila tu Flutter Web en modo release
+      # 5. Build Flutter Web in release mode
       - name: Build Flutter Web
         run: flutter build web --release
 
+      # 6. Install OIDC client package for Azure Static Web Apps auth
       - name: Install OIDC Client from Core Package
         run: npm install @actions/core@1.6.0 @actions/http-client
 
+      # 7. Acquire GitHub OIDC ID token
       - name: Get Id Token
         uses: actions/github-script@v6
         id: idtoken
         with:
-           script: |
-               const coredemo = require('@actions/core')
-               return await coredemo.getIDToken()
-           result-encoding: string
+          script: |
+            const core = require('@actions/core');
+            return await core.getIDToken();
+          result-encoding: string
 
-      # 4) Ahora sí, despliega el contenido generado en build/web
+      # 8. Deploy to Azure Static Web Apps
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PURPLE_ROCK_09F99A41E }}
-          action: "upload"
-          app_location: "/"                 # raíz de tu proyecto Flutter
-          api_location: ""                  # vacío si no usas Azure Functions
-          output_location: "build/web"      # carpeta generada por flutter build web
+          action: upload
+          app_location: "/"                   # Ruta a tu proyecto Flutter
+          api_location: ""                    # Vacío si no utilizas Azure Functions
+          output_location: "build/web"        # Carpeta generada por `flutter build web`
           github_id_token: ${{ steps.idtoken.outputs.result }}
 
   close_pull_request_job:
@@ -76,7 +84,6 @@ jobs:
     name: Close Pull Request Job
     steps:
       - name: Close Pull Request
-        id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
-          action: "close"
+          action: close
